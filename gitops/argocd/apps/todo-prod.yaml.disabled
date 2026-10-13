@@ -1,0 +1,23 @@
+# Rename to todo-prod.yaml once you're running on EKS with RDS + External Secrets.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: todo-prod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirthikesh/devops-e2e.git
+    targetRevision: main
+    path: charts/devops-e2e
+    helm:
+      valueFiles:
+        - ../../gitops/envs/prod/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: todo-prod
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

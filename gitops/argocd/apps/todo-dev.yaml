@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: todo-dev
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirthikesh/devops-e2e.git
+    targetRevision: main
+    path: charts/devops-e2e
+    helm:
+      valueFiles:
+        - ../../gitops/envs/dev/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: todo-dev
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]
+    retry:   # first sync may race the monitoring CRDs
+      limit: 5
+      backoff: { duration: 10s, factor: 2, maxDuration: 3m }
