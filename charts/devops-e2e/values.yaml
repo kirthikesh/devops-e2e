@@ -1,0 +1,59 @@
+api:
+  image:
+    repository: ghcr.io/kirthikesh/devops-e2e-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  port: 8000
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+frontend:
+  image:
+    repository: ghcr.io/kirthikesh/devops-e2e-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  port: 8080
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
+# Where DATABASE_URL comes from:
+#  - postgres.enabled=true  -> in-cluster Postgres + plain Secret (local/dev)
+#  - externalSecret.enabled -> AWS Secrets Manager via External Secrets Operator (prod/EKS)
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  user: todo
+  password: todo   # local only, never use in prod
+  database: todo
+  storage: 1Gi
+
+externalSecret:
+  enabled: false
+  secretStore: aws-secrets-manager
+  remoteKey: devops-e2e/database-url
+
+ingress:
+  enabled: true
+  className: nginx
+  host: todo.localtest.me
+  tls: false
+
+serviceMonitor:
+  enabled: false   # turn on once kube-prometheus-stack is installed
+  releaseLabel: kube-prometheus-stack
+
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

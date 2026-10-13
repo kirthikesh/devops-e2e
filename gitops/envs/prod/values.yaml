@@ -1,0 +1,30 @@
+# Prod on EKS: RDS via AWS Secrets Manager, images from ECR, autoscaling on.
+# Promote to prod by copying the tested tag from envs/dev in a pull request.
+api:
+  image:
+    repository: <AWS_ACCOUNT_ID>.dkr.ecr.eu-west-1.amazonaws.com/devops-e2e-api
+    tag: latest
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+
+frontend:
+  image:
+    repository: <AWS_ACCOUNT_ID>.dkr.ecr.eu-west-1.amazonaws.com/devops-e2e-frontend
+    tag: latest
+  replicas: 2
+
+postgres:
+  enabled: false
+
+externalSecret:
+  enabled: true
+  remoteKey: devops-e2e/database-url
+
+ingress:
+  host: todo.example.com
+  tls: true
+
+serviceMonitor:
+  enabled: true

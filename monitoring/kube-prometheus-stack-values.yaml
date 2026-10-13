@@ -1,0 +1,34 @@
+grafana:
+  adminPassword: admin   # change for anything non-local
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki-stack.monitoring.svc:3100
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+
+prometheus:
+  prometheusSpec:
+    # Pick up ServiceMonitors/PrometheusRules from any namespace
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    retention: 3d
+
+alertmanager:
+  config:
+    route:
+      receiver: default
+      group_by: [alertname, namespace]
+      routes:
+        - matchers: ['severity=~"warning|critical"']
+          receiver: slack
+    receivers:
+      - name: default
+      - name: slack
+        slack_configs:
+          - api_url: https://hooks.slack.com/services/REPLACE/ME   # put real webhook in a Secret for real use
+            channel: "#alerts"
+            send_resolved: true
+            title: '{{ .CommonAnnotations.summary }}'
