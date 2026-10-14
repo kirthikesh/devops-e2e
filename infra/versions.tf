@@ -6,9 +6,9 @@ terraform {
     random = { source = "hashicorp/random", version = "~> 3.6" }
   }
 
-  # Fill in the bucket created by infra/bootstrap
+  # Bucket comes from infra/backend.hcl (git-ignored), created by infra/bootstrap:
+  #   terraform init -backend-config=backend.hcl
   backend "s3" {
-    bucket         = "REPLACE-ME-tf-state"
     key            = "devops-e2e/terraform.tfstate"
     region         = "eu-west-1"
     dynamodb_table = "terraform-locks"

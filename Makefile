@@ -3,7 +3,7 @@ NS        ?= todo-dev
 TAG       ?= local
 CHART     := charts/devops-e2e
 
-.PHONY: help test compose-up compose-down kind-up images deploy monitoring argocd port-grafana port-argocd kind-down tf-plan tf-apply tf-destroy
+.PHONY: help test compose-up compose-down kind-up images deploy monitoring argocd port-grafana port-argocd kind-down eks-up eks-down tf-plan tf-apply tf-destroy
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
@@ -70,12 +70,35 @@ port-argocd: ## ArgoCD UI on https://localhost:8443
 kind-down: ## Delete kind cluster
 	kind delete cluster --name $(CLUSTER)
 
+# ---------- Week 4-6 on AWS (run after tf-apply) ----------
+INGRESS_AWS := https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/aws/deploy.yaml
+
+eks-up: ## On EKS: ingress (NLB), External Secrets, ArgoCD + EKS app-of-apps
+	$$(cd infra && terraform output -raw kubeconfig_command)
+	kubectl apply -f $(INGRESS_AWS)
+	helm repo add external-secrets https://charts.external-secrets.io
+	helm repo update external-secrets
+	helm upgrade --install external-secrets external-secrets/external-secrets \
+	  -n external-secrets --create-namespace --wait \
+	  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=$$(cd infra && terraform output -raw external_secrets_role_arn)
+	kubectl apply -f k8s/cluster-secret-store.yaml
+	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+	kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
+	kubectl apply -f gitops/argocd/root-app-eks.yaml
+	@echo "ArgoCD admin password:"; kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
+
+eks-down: ## Delete the AWS load balancer, then terraform destroy (stops all costs)
+	-kubectl delete -f $(INGRESS_AWS) --ignore-not-found --wait=true
+	@echo "Waiting 90s for AWS to remove the load balancer..."; sleep 90
+	cd infra && terraform destroy
+
 # ---------- Week 4: AWS (costs money!) ----------
 tf-plan: ## terraform plan
-	cd infra && terraform init && terraform plan
+	cd infra && terraform init -backend-config=backend.hcl && terraform plan
 
 tf-apply: ## terraform apply (creates EKS, RDS, ECR)
-	cd infra && terraform apply
+	cd infra && terraform init -backend-config=backend.hcl && terraform apply
 
 tf-destroy: ## ALWAYS run after a session
 	cd infra && terraform destroy

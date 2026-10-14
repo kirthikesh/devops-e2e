@@ -10,3 +10,5 @@ __pycache__/
 *.tfvars
 .terraform.lock.hcl.bak
 .env
+infra/backend.hcl
+tfplan

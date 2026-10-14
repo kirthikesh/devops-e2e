@@ -15,12 +15,19 @@ variable "vpc_cidr" {
 
 variable "cluster_version" {
   type    = string
-  default = "1.31"
+  default = "1.37"
 }
 
+# Free-plan accounts may only launch free-tier-eligible types (2 vCPU / 8 GiB)
 variable "node_instance_types" {
   type    = list(string)
-  default = ["t3.medium"]
+  default = ["m7i-flex.large"]
+}
+
+variable "node_capacity_type" {
+  type        = string
+  description = "ON_DEMAND or SPOT (SPOT is cheaper on paid accounts)"
+  default     = "ON_DEMAND"
 }
 
 variable "node_desired" {
