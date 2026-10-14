@@ -1,0 +1,20 @@
+# Local-only: serve ArgoCD UI at http://argocd.localtest.me via ingress-nginx.
+# Requires server.insecure=true (TLS is not needed on the local kind cluster).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: argocd.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
