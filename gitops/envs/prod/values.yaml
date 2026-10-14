@@ -4,7 +4,7 @@
 # from envs/dev to here via pull request.
 api:
   image:
-    tag: latest
+    tag: c3555e16085fc6c572707ea10166822eeeeb3420
   autoscaling:
     enabled: true
     minReplicas: 2
@@ -12,7 +12,7 @@ api:
 
 frontend:
   image:
-    tag: latest
+    tag: c3555e16085fc6c572707ea10166822eeeeb3420
   replicas: 2
 
 postgres:
