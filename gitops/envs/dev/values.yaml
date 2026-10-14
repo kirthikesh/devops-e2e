@@ -1,13 +1,13 @@
 # Dev (local kind or EKS dev). CI updates the image tags below automatically.
 api:
   image:
-    tag: 6ba883a6357945464f9a1571eb9e96d96f6a7629
+    tag: 67b1bb8ba104ce9241b4cb6ce82171b132b481a6
   autoscaling:
     enabled: false
   replicas: 1
 frontend:
   image:
-    tag: 6ba883a6357945464f9a1571eb9e96d96f6a7629
+    tag: 67b1bb8ba104ce9241b4cb6ce82171b132b481a6
   replicas: 1
 postgres:
   enabled: true
