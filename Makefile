@@ -22,7 +22,9 @@ compose-down: ## Stop Compose stack
 kind-up: ## Create kind cluster + NGINX ingress
 	kind create cluster --config k8s/kind-config.yaml
 	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-	kubectl wait -n ingress-nginx --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=180s
+	kubectl label node $(CLUSTER)-control-plane ingress-ready=true --overwrite
+	kubectl -n ingress-nginx patch deploy ingress-nginx-controller --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"ingress-ready":"true","kubernetes.io/os":"linux"},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}'
+	kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=180s
 
 images: ## Build images and load them into kind
 	docker build -t devops-e2e-api:$(TAG) app/api
@@ -51,8 +53,12 @@ monitoring: ## Install Prometheus/Grafana/Alertmanager + Loki
 argocd: ## Install ArgoCD and bootstrap app-of-apps
 	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+	kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"server.insecure":"true"}}'
+	kubectl -n argocd rollout restart deploy/argocd-server
 	kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
+	kubectl apply -f k8s/argocd-ingress.yaml
 	kubectl apply -f gitops/argocd/root-app.yaml
+	@echo "ArgoCD UI: http://argocd.localtest.me  (user: admin)"
 	@echo "ArgoCD admin password:"; kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
 
 port-grafana: ## Grafana on http://localhost:3000 (admin/admin)

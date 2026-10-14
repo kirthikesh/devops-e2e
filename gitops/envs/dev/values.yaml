@@ -14,6 +14,6 @@ postgres:
 ingress:
   host: todo.localtest.me
 serviceMonitor:
-  enabled: true
+  enabled: false   # re-enable with monitoring in week 6
 podDisruptionBudget:
   enabled: false

@@ -3,12 +3,10 @@ apiVersion: kind.x-k8s.io/v1alpha4
 name: devops-e2e
 nodes:
   - role: control-plane
-    kubeadmConfigPatches:
-      - |
-        kind: InitConfiguration
-        nodeRegistration:
-          kubeletExtraArgs:
-            node-labels: "ingress-ready=true"
+    # ingress-nginx is pinned to this node (see Makefile kind-up), because
+    # only this node maps ports 80/443 to the host.
+    labels:
+      ingress-ready: "true"
     extraPortMappings:
       - { containerPort: 80, hostPort: 80, protocol: TCP }
       - { containerPort: 443, hostPort: 443, protocol: TCP }
