@@ -43,3 +43,10 @@ def test_empty_title_rejected():
 def test_metrics_exposed():
     client.get("/health")
     assert "http_requests_total" in client.get("/metrics").text
+
+
+def test_postgres_driver_installed():
+    """Catches a missing DB driver without needing a running Postgres."""
+    from sqlalchemy import create_engine
+
+    create_engine("postgresql://user:pass@localhost:5432/db")  # imports the driver, doesn't connect
