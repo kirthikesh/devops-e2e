@@ -50,7 +50,7 @@ monitoring: ## Install Prometheus/Grafana/Alertmanager + Loki
 
 argocd: ## Install ArgoCD and bootstrap app-of-apps
 	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+	kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 	kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
 	kubectl apply -f gitops/argocd/root-app.yaml
 	@echo "ArgoCD admin password:"; kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
