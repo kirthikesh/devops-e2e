@@ -22,7 +22,8 @@ module "eks" {
   eks_managed_node_groups = {
     default = {
       instance_types = var.node_instance_types
-      capacity_type  = "SPOT" # ~70% cheaper for a portfolio cluster
+      ami_type       = "AL2023_x86_64_STANDARD"
+      capacity_type  = var.node_capacity_type
       min_size       = 1
       max_size       = 4
       desired_size   = var.node_desired

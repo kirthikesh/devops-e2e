@@ -1,0 +1,18 @@
+# App-of-apps for the EKS cluster: prod app (RDS) + monitoring.
+# The local kind cluster uses root-app.yaml (gitops/argocd/apps) instead.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kirthikesh/devops-e2e.git
+    targetRevision: main
+    path: gitops/argocd/clusters/eks
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
