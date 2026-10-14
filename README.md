@@ -38,6 +38,8 @@ Rollback is `git revert`. Every deploy, dev or prod, is a commit.
 | ![Golden signals](docs/screenshots/03-grafana-golden-signals.png) | ![Pod CPU](docs/screenshots/04-grafana-pod-cpu.png) |
 | **CI history: red until the Trivy gate's CVEs were fixed** | **The app** (footer shows the deployed commit SHA) |
 | ![GitHub Actions](docs/screenshots/05-github-actions-ci.png) | ![Todo app](docs/screenshots/06-todo-app.png) |
+| **Prod promotion: the PR the workflow opens** | **Prod promotion: the whole deploy is a 2-line diff** |
+| ![Promotion PR](docs/screenshots/08-prod-promotion-pr.png) | ![Promotion PR diff](docs/screenshots/07-prod-promotion-pr-diff.png) |
 
 ## Stack
 
