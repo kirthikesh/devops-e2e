@@ -76,6 +76,7 @@ INGRESS_AWS := https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/d
 eks-up: ## On EKS: ingress (NLB), External Secrets, ArgoCD + EKS app-of-apps
 	$$(cd infra && terraform output -raw kubeconfig_command)
 	kubectl apply -f $(INGRESS_AWS)
+	kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 	helm repo add external-secrets https://charts.external-secrets.io
 	helm repo update external-secrets
 	helm upgrade --install external-secrets external-secrets/external-secrets \
