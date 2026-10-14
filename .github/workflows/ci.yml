@@ -18,12 +18,12 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run: { working-directory: app/api }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12", cache: pip, cache-dependency-path: app/api/requirements-dev.txt }
       - run: pip install -r requirements-dev.txt
       - name: Lint
@@ -32,41 +32,41 @@ jobs:
         run: pytest -q
 
   helm-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
       - run: helm lint charts/devops-e2e -f gitops/envs/dev/values.yaml
       - run: helm template charts/devops-e2e -f gitops/envs/prod/values.yaml > /dev/null
 
   sonarcloud:
     if: ${{ vars.SONAR_ENABLED == 'true' }}   # set repo variable + SONAR_TOKEN secret to enable
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
-      - uses: SonarSource/sonarqube-scan-action@v4
+      - uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
 
   build:
     needs: [test, helm-lint]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         service: [api, frontend]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         if: github.event_name == 'push'
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: app/${{ matrix.service }}
           load: true
@@ -80,7 +80,7 @@ jobs:
           format: sarif
           output: trivy-${{ matrix.service }}.sarif
           exit-code: "0"
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
@@ -105,16 +105,28 @@ jobs:
   update-gitops:
     if: github.event_name == 'push'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # One deploy commit at a time: a newer run replaces a queued older one
+    concurrency:
+      group: gitops-dev
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
-      - name: Bump dev image tags
-        run: |
-          yq -i '.api.image.tag = "${{ github.sha }}" | .frontend.image.tag = "${{ github.sha }}"' gitops/envs/dev/values.yaml
-      - name: Commit
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - name: Bump dev image tags and push (retry if main moved)
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add gitops/envs/dev/values.yaml
-          git commit -m "deploy(dev): ${{ github.sha }}" || echo "nothing to commit"
-          git push
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase --quiet origin main
+            yq -i '.api.image.tag = "${{ github.sha }}" | .frontend.image.tag = "${{ github.sha }}"' gitops/envs/dev/values.yaml
+            git add gitops/envs/dev/values.yaml
+            if git diff --cached --quiet; then echo "Tag already up to date"; exit 0; fi
+            git commit --quiet -m "deploy(dev): ${{ github.sha }}"
+            if git push origin HEAD:main; then exit 0; fi
+            echo "Push rejected because main moved; retrying ($attempt/5)"
+            git reset --hard --quiet origin/main
+            sleep $((attempt * 3))
+          done
+          exit 1
