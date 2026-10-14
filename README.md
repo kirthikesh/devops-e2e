@@ -15,25 +15,8 @@ End-to-end DevOps platform for a small todo app: containers → Kubernetes → C
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  dev[Developer] -->|git push| gh[GitHub]
-  gh --> ci[GitHub Actions<br/>lint · test · Trivy · Sonar]
-  ci -->|push image| reg[(GHCR / ECR)]
-  ci -->|bump tag| gitops[gitops/envs/*]
-  argo[ArgoCD] -->|watches| gitops
-  argo -->|syncs Helm chart| k8s
-  subgraph k8s[Kubernetes · kind or EKS]
-    ing[Ingress NGINX] --> fe[frontend] --> api[api]
-    api --> db[(Postgres / RDS)]
-    prom[Prometheus] -->|scrapes /metrics| api
-    prom --> am[Alertmanager] --> slack[Slack]
-    loki[Loki] --- graf[Grafana]
-    prom --- graf
-  end
-  reg --> k8s
-  tf[Terraform] -->|VPC · EKS · RDS · ECR · Secrets| aws[(AWS eu-west-1)]
-```
+<img width="3120" height="1965" alt="image" src="https://github.com/user-attachments/assets/65409ff8-a5fd-41a9-b135-1e6b7c3efc91" />
+
 
 ## Repo layout
 
