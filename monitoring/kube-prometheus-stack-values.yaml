@@ -1,34 +1,101 @@
-grafana:
-  adminPassword: admin   # change for anything non-local
-  additionalDataSources:
-    - name: Loki
-      type: loki
-      url: http://loki-stack.monitoring.svc:3100
-  sidecar:
-    dashboards:
-      enabled: true
-      searchNamespace: ALL
+# kube-prometheus-stack, sized for a laptop kind cluster (~1.2 GB total).
+# For a real cluster: raise retention/resources and enable persistence.
+
+# kind doesn't expose these control-plane metrics, so their targets and alerts
+# would only produce noise ("TargetDown", "KubeSchedulerDown", ...).
+kubeEtcd: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeControllerManager: { enabled: false }
+kubeProxy: { enabled: false }
+windowsMonitoring: { enabled: false }
+
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+    windows: false
 
 prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: [prometheus.localtest.me]
+    paths: ["/"]
+    pathType: Prefix
   prometheusSpec:
-    # Pick up ServiceMonitors/PrometheusRules from any namespace
+    # Pick up ServiceMonitors/PrometheusRules from any namespace and release
     serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
-    retention: 3d
+    scrapeInterval: 30s
+    retention: 1d
+    retentionSize: 1GB
+    resources:
+      requests: { cpu: 100m, memory: 400Mi }
+      limits: { memory: 1Gi }
 
 alertmanager:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: [alertmanager.localtest.me]
+    paths: ["/"]
+    pathType: Prefix
+  alertmanagerSpec:
+    resources:
+      requests: { cpu: 10m, memory: 32Mi }
+      limits: { memory: 128Mi }
   config:
     route:
       receiver: default
       group_by: [alertname, namespace]
+      group_wait: 30s
+      repeat_interval: 4h
       routes:
+        - matchers: ['alertname="Watchdog"']   # always-firing heartbeat, ignore
+          receiver: default
         - matchers: ['severity=~"warning|critical"']
           receiver: slack
     receivers:
       - name: default
       - name: slack
         slack_configs:
-          - api_url: https://hooks.slack.com/services/REPLACE/ME   # put real webhook in a Secret for real use
+          # Replace with a real webhook (ideally from a Secret) to get Slack alerts.
+          # Until then, view alerts at http://alertmanager.localtest.me
+          - api_url: https://hooks.slack.com/services/REPLACE/ME
             channel: "#alerts"
             send_resolved: true
             title: '{{ .CommonAnnotations.summary }}'
+
+grafana:
+  adminPassword: admin   # local only
+  persistence: { enabled: false }
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: [grafana.localtest.me]
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL   # picks up ConfigMaps labelled grafana_dashboard=1
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 384Mi }
+
+prometheusOperator:
+  resources:
+    requests: { cpu: 20m, memory: 64Mi }
+    limits: { memory: 192Mi }
+
+kube-state-metrics:
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { memory: 128Mi }
+
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 10m, memory: 16Mi }
+    limits: { memory: 64Mi }
