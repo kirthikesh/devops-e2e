@@ -1,19 +1,19 @@
 # Dev (local kind or EKS dev). CI updates the image tags below automatically.
 api:
   image:
-    tag: 67b1bb8ba104ce9241b4cb6ce82171b132b481a6
+    tag: 597bb806f31c800e5729d87d7b2f9f601f51ed5a
   autoscaling:
     enabled: false
   replicas: 1
 frontend:
   image:
-    tag: 67b1bb8ba104ce9241b4cb6ce82171b132b481a6
+    tag: 597bb806f31c800e5729d87d7b2f9f601f51ed5a
   replicas: 1
 postgres:
   enabled: true
 ingress:
   host: todo.localtest.me
 serviceMonitor:
-  enabled: false   # re-enable with monitoring in week 6
+  enabled: false # re-enable with monitoring in week 6
 podDisruptionBudget:
   enabled: false
