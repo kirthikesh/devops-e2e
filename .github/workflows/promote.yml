@@ -1,0 +1,91 @@
+name: Promote to prod
+
+# Manual, reviewable promotion: opens a PR that pins prod to an exact image SHA.
+# Merging the PR is the deploy (ArgoCD syncs gitops/envs/prod/values.yaml).
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA to promote (leave empty = whatever dev runs now)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: promote-prod
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Work out which version to promote
+        id: tag
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          TAG="${INPUT_SHA:-$(yq '.api.image.tag' gitops/envs/dev/values.yaml)}"
+          if ! [[ "$TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::'$TAG' is not a full 40-character commit SHA"; exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "short=${TAG:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Check both images exist in GHCR
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          for svc in api frontend; do
+            img="ghcr.io/${OWNER}/devops-e2e-${svc}:${TAG}"
+            docker manifest inspect "$img" > /dev/null \
+              || { echo "::error::$img not found - was CI green for this commit?"; exit 1; }
+            echo "found $img"
+          done
+
+      - name: Open promotion pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          SHORT: ${{ steps.tag.outputs.short }}
+          SERVER: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          BRANCH="promote/prod-${SHORT}"
+          CURRENT=$(yq '.api.image.tag' gitops/envs/prod/values.yaml)
+          if [ "$CURRENT" = "$TAG" ]; then echo "Prod already runs ${SHORT}"; exit 0; fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          # Edit only the two tag lines (keeps comments/blank lines, so the PR diff is minimal)
+          sed -E -i "s/^(    tag: ).*/\1${TAG}/" gitops/envs/prod/values.yaml
+          for svc in api frontend; do
+            [ "$(yq ".${svc}.image.tag" gitops/envs/prod/values.yaml)" = "$TAG" ] \
+              || { echo "::error::failed to set ${svc} tag"; exit 1; }
+          done
+          git commit -qam "deploy(prod): promote ${SHORT}"
+          git push --force -u origin "$BRANCH"
+
+          {
+            echo "Promotes **\`${SHORT}\`** to prod (currently \`${CURRENT:0:12}\`)."
+            echo
+            echo "- Commit: ${SERVER}/${REPO}/commit/${TAG}"
+            if [[ "$CURRENT" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "- Changes since prod: ${SERVER}/${REPO}/compare/${CURRENT}...${TAG}"
+            fi
+            echo "- Images: \`ghcr.io/.../devops-e2e-{api,frontend}:${TAG}\` (built, tested and Trivy-scanned by CI)"
+            echo
+            echo "**Merging this PR deploys to prod** (ArgoCD syncs \`gitops/envs/prod\`). Roll back with \`git revert\`."
+          } > pr-body.md
+
+          gh pr create --base main --head "$BRANCH" \
+            --title "deploy(prod): promote ${SHORT}" --body-file pr-body.md \
+            || gh pr edit "$BRANCH" --body-file pr-body.md
